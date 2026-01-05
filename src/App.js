@@ -5,29 +5,27 @@ import './App.css';
 
 function App() {
   const [movies, setMovies] = useState([]);
-  function fetchMoviesHandler() {
-    fetch('https://swapi.py4e.com/api/films/')
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error('Failed to fetch movies');
-        }
-        return response.json();
-      })
-      .then((data) => {
-        const transformedMovies = data.results.map((movieData) => {
-          return {
-            id: movieData.episode_id,
-            title: movieData.title,
-            openingText: movieData.opening_crawl,
-            releaseDate: movieData.release_date,
-          };
-        });
-        setMovies(transformedMovies);
-      })
-      .catch((error) => {
-        console.error('Error fetching movies:', error);
-        alert('Failed to fetch movies. Please try again later.');
+  async function fetchMoviesHandler() {
+    try {
+      const response = await fetch('https://swapi.py4e.com/api/films/');
+      if (!response.ok) {
+        throw new Error('Failed to fetch movies');
+      }
+      const data = await response.json();
+
+      const transformedMovies = data.results.map((movieData) => {
+        return {
+          id: movieData.episode_id,
+          title: movieData.title,
+          openingText: movieData.opening_crawl,
+          releaseDate: movieData.release_date,
+        };
       });
+      setMovies(transformedMovies);
+    } catch (error) {
+      console.error('Error fetching movies:', error);
+      alert('Failed to fetch movies. Please try again later.');
+    }
   }
 
   return (
