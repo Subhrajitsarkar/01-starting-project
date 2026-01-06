@@ -1,153 +1,92 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import MoviesList from './components/MoviesList';
+import AddMovie from './components/AddMovie';
 import './App.css';
 
 function App() {
   const [movies, setMovies] = useState([]);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [titleInput, setTitleInput] = useState('');
-  const [openingTextInput, setOpeningTextInput] = useState('');
-  const [releaseDateInput, setReleaseDateInput] = useState('');
-  const retryTimeoutRef = useRef(null);
-  const isCancelledRef = useRef(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const attemptFetch = useCallback(async () => {
+  const fetchMoviesHandler = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      const response = await fetch('https://swapi.py4e.com/api/films/');
+      const response = await fetch('https://react-http-6cb96-default-rtdb.firebaseio.com/movies.json');
       if (!response.ok) {
-        throw new Error('Failed to fetch movies');
+        throw new Error('Something went wrong!');
       }
+
       const data = await response.json();
 
-      const transformedMovies = data.results.map((movieData) => {
-        return {
-          id: movieData.episode_id,
-          title: movieData.title,
-          openingText: movieData.opening_crawl,
-          releaseDate: movieData.release_date,
-        };
-      });
-      setMovies(transformedMovies);
-      setIsRetrying(false);
-      setErrorMessage('');
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
+      const loadedMovies = [];
+
+      for (const key in data) {
+        loadedMovies.push({
+          id: key,
+          title: data[key].title,
+          openingText: data[key].openingText,
+          releaseDate: data[key].releaseDate,
+        });
       }
+
+      setMovies(loadedMovies);
     } catch (error) {
-      console.error('Error fetching movies:', error);
-      setErrorMessage('Something went wrong ....Retrying');
-      setIsRetrying(true);
-
-      if (!isCancelledRef.current) {
-        retryTimeoutRef.current = setTimeout(() => {
-          if (!isCancelledRef.current) {
-            attemptFetch();
-          }
-        }, 5000);
-      }
+      setError(error.message);
     }
+    setIsLoading(false);
   }, []);
 
-  const fetchMoviesHandler = useCallback(() => {
-    // start or restart attempts
-    isCancelledRef.current = false;
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-    setErrorMessage('');
-    setIsRetrying(false);
-    attemptFetch();
-  }, [attemptFetch]);
-
-  const cancelRetry = useCallback(() => {
-    isCancelledRef.current = true;
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-    setIsRetrying(false);
-    setErrorMessage('Retrying cancelled');
-  }, []);
-
-  // auto-fetch on mount
   useEffect(() => {
     fetchMoviesHandler();
   }, [fetchMoviesHandler]);
 
-  const moviesMemo = useMemo(() => movies, [movies]);
+  async function addMovieHandler(movie) {
+    const response = await fetch('https://react-http-6cb96-default-rtdb.firebaseio.com/movies.json', {
+      method: 'POST',
+      body: JSON.stringify(movie),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    console.log(data);
+    fetchMoviesHandler();
+  }
 
-  function addMovieHandler(e) {
-    e.preventDefault && e.preventDefault();
-    const newMovie = {
-      title: titleInput,
-      openingText: openingTextInput,
-      releaseDate: releaseDateInput,
-    };
-    console.log(newMovie);
+  async function deleteMovieHandler(movieId) {
+    const response = await fetch(`https://react-http-6cb96-default-rtdb.firebaseio.com/movies/${movieId}.json`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    console.log(data);
+    setMovies(prevMovies => prevMovies.filter(movie => movie.id !== movieId));
+  }
+
+  let content = <p>Found no movies.</p>;
+
+  if (movies.length > 0) {
+    content = <MoviesList movies={movies} onDeleteMovie={deleteMovieHandler} />;
+  }
+
+  if (error) {
+    content = <p>{error}</p>;
+  }
+
+  if (isLoading) {
+    content = <p>Loading...</p>;
   }
 
   return (
     <React.Fragment>
       <section>
-        <form onSubmit={addMovieHandler} style={{ padding: '1rem', background: 'transparent' }}>
-          <div style={{ marginBottom: '0.5rem' }}>
-            <label style={{ display: 'block', fontWeight: 700 }}>Title</label>
-            <input
-              type="text"
-              value={titleInput}
-              onChange={(e) => setTitleInput(e.target.value)}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px' }}
-            />
-          </div>
-          <div style={{ marginBottom: '0.5rem' }}>
-            <label style={{ display: 'block', fontWeight: 700 }}>Opening Text</label>
-            <textarea
-              value={openingTextInput}
-              onChange={(e) => setOpeningTextInput(e.target.value)}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px' }}
-            />
-          </div>
-          <div style={{ marginBottom: '0.5rem' }}>
-            <label style={{ display: 'block', fontWeight: 700 }}>Release Date</label>
-            <input
-              type="text"
-              value={releaseDateInput}
-              onChange={(e) => setReleaseDateInput(e.target.value)}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px' }}
-            />
-          </div>
-          <div>
-            <button type="submit" style={{ background: '#3b0b6f', color: '#fff', padding: '8px 16px', borderRadius: '20px' }}>
-              Add Movie
-            </button>
-          </div>
-        </form>
+        <AddMovie onAddMovie={addMovieHandler} />
       </section>
-
       <section>
         <button onClick={fetchMoviesHandler}>Fetch Movies</button>
-        {isRetrying && (
-          <button onClick={cancelRetry} style={{ marginLeft: '8px' }}>
-            Cancel
-          </button>
-        )}
-        {errorMessage && <p>{errorMessage}</p>}
       </section>
-      <section>
-        <MoviesList movies={moviesMemo} />
-      </section>
+      <section>{content}</section>
     </React.Fragment>
   );
 }
