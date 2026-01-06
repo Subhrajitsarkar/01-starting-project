@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
 import MoviesList from './components/MoviesList';
 import './App.css';
@@ -18,7 +18,7 @@ function App() {
     };
   }, []);
 
-  async function attemptFetch() {
+  const attemptFetch = useCallback(async () => {
     try {
       const response = await fetch('https://swapi.py4e.com/api/films/');
       if (!response.ok) {
@@ -54,9 +54,9 @@ function App() {
         }, 5000);
       }
     }
-  }
+  }, []);
 
-  function fetchMoviesHandler() {
+  const fetchMoviesHandler = useCallback(() => {
     // start or restart attempts
     isCancelledRef.current = false;
     if (retryTimeoutRef.current) {
@@ -66,9 +66,9 @@ function App() {
     setErrorMessage('');
     setIsRetrying(false);
     attemptFetch();
-  }
+  }, [attemptFetch]);
 
-  function cancelRetry() {
+  const cancelRetry = useCallback(() => {
     isCancelledRef.current = true;
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
@@ -76,7 +76,14 @@ function App() {
     }
     setIsRetrying(false);
     setErrorMessage('Retrying cancelled');
-  }
+  }, []);
+
+  // auto-fetch on mount
+  useEffect(() => {
+    fetchMoviesHandler();
+  }, [fetchMoviesHandler]);
+
+  const moviesMemo = useMemo(() => movies, [movies]);
 
   return (
     <React.Fragment>
@@ -90,7 +97,7 @@ function App() {
         {errorMessage && <p>{errorMessage}</p>}
       </section>
       <section>
-        <MoviesList movies={movies} />
+        <MoviesList movies={moviesMemo} />
       </section>
     </React.Fragment>
   );
